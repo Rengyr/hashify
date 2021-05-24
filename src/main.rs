@@ -49,13 +49,14 @@ fn main() {
         )
         .get_matches();
 
+    //Parsing arguments
     let input: &str = matches.value_of("input").unwrap_or("");
 
     let recursive: bool = matches.is_present("recursive");
 
     let output: &str = matches.value_of("output").unwrap_or("");
 
-    let verbose:u8 = match matches.occurrences_of("verbose") {
+    let verbose: u8 = match matches.occurrences_of("verbose") {
         0 => 0,
         1 => 1,
         2 | _ => 2,
@@ -67,6 +68,7 @@ fn main() {
         .parse::<usize>()
         .unwrap_or(128);
 
+    //Read from stdin
     if input.is_empty() {
         let mut hasher = Hasher::new();
 
@@ -86,6 +88,7 @@ fn main() {
         }
         println!("{:08x}", hasher.finalize());
     } else {
+        //Read file or directory
         let metadata: Metadata = match metadata(input) {
             Ok(metadata) => metadata,
             Err(_) => {
@@ -94,6 +97,7 @@ fn main() {
             }
         };
 
+        //Input is a file
         if metadata.is_file() {
             match crc32_hash(PathBuf::from(input), buffer_size) {
                 Ok(hash) => {
@@ -106,12 +110,14 @@ fn main() {
                 }
             }
         } else if metadata.is_dir() {
+            //Input is a directory
             let mut hashes: HashMap<String, u32> = HashMap::new();
             let mut hashes_old: HashMap<String, u32> = HashMap::new();
             let mut seen: HashSet<PathBuf> = HashSet::new();
             let mut directories: VecDeque<PathBuf> = VecDeque::new();
             directories.push_back(PathBuf::from(input));
 
+            //Load hashes if exists
             if Path::new(output).exists() {
                 load_file(&mut hashes_old, output);
             }
@@ -119,6 +125,7 @@ fn main() {
             let output_path = Path::new(output);
             let output_file_name = output_path.file_name().unwrap_or(OsStr::new(""));
 
+            //Iterate through directory/ies
             loop {
                 if directories.is_empty() {
                     break;
@@ -164,13 +171,17 @@ fn main() {
                                 let old_hash = hashes_old.get(&file_os_name).unwrap();
                                 if *old_hash != hash {
                                     eprintln!("File hash mismatch:\n\tFile: {}\n\tOld Hash: {:08x}\n\tNew Hash: {:08x}", file_os_name, old_hash, hash);
+                                } else if verbose >= 2 {
+                                    println!(
+                                        "Known file found:\n\tFile: {}\n\tHash: {:08x}",
+                                        file_os_name, hash
+                                    );
                                 }
-                                else if verbose >= 2{
-                                    println!("Known file found:\n\tFile: {}\n\tHash: {:08x}", file_os_name, hash);
-                                }
-                            }
-                            else if verbose >= 1{
-                                println!("New file found:\n\tFile: {}\n\tHash: {:08x}", file_os_name, hash);
+                            } else if verbose >= 1 {
+                                println!(
+                                    "New file found:\n\tFile: {}\n\tHash: {:08x}",
+                                    file_os_name, hash
+                                );
                             }
 
                             hashes.insert(file_os_name, hash);
@@ -183,15 +194,20 @@ fn main() {
                     }
                 }
             }
+            //Print to stdout if output file not specified
             if output == "" {
                 for (file, hash) in hashes.iter() {
                     println!("{:08x}\t{}", hash, file);
                 }
             } else {
-                if verbose >=1 {
-                    let removed_iter = hashes_old.iter().filter(|x|!hashes.contains_key(x.0));
+                //Write to file if output file specified
+                if verbose >= 1 {
+                    let removed_iter = hashes_old.iter().filter(|x| !hashes.contains_key(x.0));
                     for (file, hash) in removed_iter {
-                        println!("Removed file found:\n\tFile: {}\n\tHash: {:08x}", file, hash);
+                        println!(
+                            "Removed file found:\n\tFile: {}\n\tHash: {:08x}",
+                            file, hash
+                        );
                     }
                 }
 
@@ -218,6 +234,7 @@ fn main() {
     }
 }
 
+//Calculate crc32 for given file
 fn crc32_hash(input: PathBuf, buffer_size: usize) -> Result<u32, io::Error> {
     let mut hasher = Hasher::new();
 
@@ -233,6 +250,7 @@ fn crc32_hash(input: PathBuf, buffer_size: usize) -> Result<u32, io::Error> {
     Ok(hasher.finalize())
 }
 
+//Load hashes into HashMap
 fn load_file(hashes: &mut HashMap<String, u32>, file: &str) {
     let f = match File::open(file) {
         Ok(f) => f,

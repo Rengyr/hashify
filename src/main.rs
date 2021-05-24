@@ -12,7 +12,7 @@ use std::{fs, io, process};
 
 fn main() {
     let matches = App::new("Hashify")
-        .version("1.2.1")
+        .version("1.2.2")
         .author("Dominik 'Rengyr' Kosík <of@rengyr.eu>")
         .about("CRC32 hash.")
         .arg(

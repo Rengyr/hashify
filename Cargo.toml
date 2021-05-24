@@ -1,6 +1,6 @@
 [package]
 name = "hashify"
-version = "1.2.1"
+version = "1.2.2"
 authors = ["Dominik 'Rengyr' Kosík <of@rengyr.eu>"]
 edition = "2018"
 

@@ -39,7 +39,7 @@ fn main() {
         Arg::with_name("verbose")
             .short("v")
             .multiple(true)
-            .help("Sets the level of verbosity: (repeat for increased verbosity)\n\tLevel 0: No verbose info\n\tLevel 1: Verbose info about new/removed files\n\tLevel 2: Verbose info about every file
+            .help("Sets the level of verbosity: (repeat for increased verbosity)\n\tLevel 1: Verbose info about new/removed files\n\tLevel 2: Verbose info about every file
                     "),
     )
         .arg(

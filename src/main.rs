@@ -13,7 +13,7 @@ use std::ffi::OsStr;
 fn main() {
     let matches = App::new("Hashify")
         .version("1.2.1")
-        .author("Rengyr <of@rengyr.eu>")
+        .author("Dominik 'Rengyr' Kosík <of@rengyr.eu>")
         .about("CRC32 hash.")
         .arg(
             Arg::with_name("recursive")

@@ -27,7 +27,7 @@ fn main() {
                 .short("o")
                 .long("output")
                 .takes_value(true)
-                .help("Output of hash file; Ignored if is in the scope"),
+                .help("Output of hash file\nIts hash is ignored\nOutput is ignored for single file hash"),
         )
         .arg(
             Arg::with_name("buffer")

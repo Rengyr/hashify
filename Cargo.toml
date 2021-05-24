@@ -1,7 +1,7 @@
 [package]
 name = "hashify"
 version = "1.2.1"
-authors = ["Dominik 'Rengyr' Kosík <dominik6kosik@gmail.com>"]
+authors = ["Dominik 'Rengyr' Kosík <of@rengyr.eu>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

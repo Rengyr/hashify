@@ -1,4 +1,5 @@
 extern crate crc32fast;
+extern crate byte_unit;
 
 use clap::{App, Arg};
 use crc32fast::Hasher;
@@ -9,10 +10,12 @@ use std::fs::{metadata, File, Metadata};
 use std::io::{BufRead, ErrorKind, Read, Write, Error};
 use std::path::{Path, PathBuf};
 use std::{fs, io, process};
+use std::time::Instant;
+use byte_unit::Byte;
 
 fn main() {
     let matches = App::new("Hashify")
-        .version("1.2.2")
+        .version("1.3.2")
         .author("Dominik 'Rengyr' Kosík <of@rengyr.eu>")
         .about("CRC32 hash.")
         .arg(
@@ -21,7 +24,14 @@ fn main() {
                 .long("recursive")
                 .takes_value(false)
                 .help("Enable recursive search"),
-        )
+        ).arg(
+        Arg::with_name("quiet")
+            .short("q")
+            .conflicts_with("verbose")
+            .long("quiet")
+            .takes_value(false)
+            .help("Disable statistics at the end"),
+    )
         .arg(
             Arg::with_name("output")
                 .short("o")
@@ -38,6 +48,7 @@ fn main() {
         ).arg(
         Arg::with_name("verbose")
             .short("v")
+            .conflicts_with("quiet")
             .multiple(true)
             .help("Sets the level of verbosity: (repeat for increased verbosity)\n\tLevel 1: Verbose info about new/removed files\n\tLevel 2: Verbose info about every file
                     "),
@@ -53,6 +64,8 @@ fn main() {
     let input: &str = matches.value_of("input").unwrap_or("");
 
     let recursive: bool = matches.is_present("recursive");
+
+    let quiet: bool = matches.is_present("quiet");
 
     let output: &str = matches.value_of("output").unwrap_or("");
 
@@ -92,7 +105,7 @@ fn main() {
         if metadata.is_file() {
             match crc32_hash(PathBuf::from(input), buffer_size) {
                 Ok(hash) => {
-                    println!("{:08x}\t{}", hash, input);
+                    println!("{:08x}\t{}", hash.0, input);
                 }
                 Err(e) => {
                     if e.kind() != ErrorKind::PermissionDenied {
@@ -102,14 +115,17 @@ fn main() {
             }
         } else if metadata.is_dir() {
             //Input is a directory
-            hashes_from_dir(buffer_size, recursive, output, input, verbose, &mut io::stdout(), &mut io::stderr());
+            hashes_from_dir(buffer_size, recursive, output, input, verbose, quiet, &mut io::stdout(), &mut io::stderr());
         }
     }
 }
 
 //Calculate crc32 for given file
-fn crc32_hash(input: PathBuf, buffer_size: usize) -> Result<u32, io::Error> {
+//Returns tuple (hash, read_bytes)
+fn crc32_hash(input: PathBuf, buffer_size: usize) -> Result<(u32, u64), io::Error> {
     let mut hasher = Hasher::new();
+
+    let mut read_bytes:u64 = 0;
 
     let mut f = File::open(input)?;
     let temp_buffer: Vec<u8> = vec![0; 1024 * buffer_size];
@@ -118,9 +134,10 @@ fn crc32_hash(input: PathBuf, buffer_size: usize) -> Result<u32, io::Error> {
 
     while length > 0 {
         length = f.read(&mut buffer)?;
+        read_bytes += length as u64;
         hasher.update(&buffer[..length]);
     }
-    Ok(hasher.finalize())
+    Ok((hasher.finalize(), read_bytes))
 }
 
 //Calculate crc32 from readable input
@@ -145,13 +162,21 @@ fn hash_from_input<R: Read>(mut input: R, buffer_size: usize) -> Result<u32, Err
 }
 
 //Calculate crc32 given directory
-fn hashes_from_dir<WS: Write, WE: Write>(buffer_size: usize, recursive: bool, output:&str, input:&str, verbose:u8, mut out_std: WS, mut out_err: WE){
+fn hashes_from_dir<WS: Write, WE: Write>(buffer_size: usize, recursive: bool, output:&str, input:&str, verbose:u8, quiet: bool, mut out_std: WS, mut out_err: WE){
     //Input is a directory
     let mut hashes: HashMap<String, u32> = HashMap::new();
     let mut hashes_old: HashMap<String, u32> = HashMap::new();
     let mut seen: HashSet<PathBuf> = HashSet::new();
     let mut directories: VecDeque<PathBuf> = VecDeque::new();
     directories.push_back(PathBuf::from(input));
+
+    //Init stats
+    let mut read_bytes: u64 = 0;
+    let mut files_processed: u64 = 0;
+    let mut files_added: u64 = 0;
+    let mut files_removed: u64 = 0;
+    let mut files_skipped: u64 = 0;
+    let start_time = Instant::now();
 
     //Load hashes if exists
     if Path::new(output).exists() {
@@ -179,6 +204,7 @@ fn hashes_from_dir<WS: Write, WE: Write>(buffer_size: usize, recursive: bool, ou
                     if e.kind() != ErrorKind::PermissionDenied {
                         writeln!(out_err, "Error when iterating file: {}", e).unwrap();
                     }
+                    files_skipped += 1;
                     continue;
                 }
             } {
@@ -188,6 +214,7 @@ fn hashes_from_dir<WS: Write, WE: Write>(buffer_size: usize, recursive: bool, ou
                         if e.kind() != ErrorKind::PermissionDenied {
                             writeln!(out_err, "Error when iterating file: {}", e).unwrap();
                         }
+                        files_skipped += 1;
                         continue;
                     }
                 };
@@ -200,15 +227,17 @@ fn hashes_from_dir<WS: Write, WE: Write>(buffer_size: usize, recursive: bool, ou
                     {
                         continue;
                     }
-                    let hash = match crc32_hash(file_name, buffer_size) {
-                        Ok(hash) => hash,
+                    let (hash, read) = match crc32_hash(file_name, buffer_size) {
+                        Ok((hash, read)) => (hash, read),
                         Err(e) => {
                             if e.kind() != ErrorKind::PermissionDenied {
                                 writeln!(out_err, "Error when calculating hash: {}", e).unwrap();
                             }
+                            files_skipped += 1;
                             continue;
                         }
                     };
+
                     if hashes_old.contains_key(&file_os_name) {
                         let old_hash = hashes_old.get(&file_os_name).unwrap();
                         if *old_hash != hash {
@@ -219,13 +248,18 @@ fn hashes_from_dir<WS: Write, WE: Write>(buffer_size: usize, recursive: bool, ou
                                 file_os_name, hash
                             ).unwrap();
                         }
-                    } else if verbose >= 1 {
-                        writeln!(out_std,
-                            "New file found:\n\tFile: {}\n\tHash: {:08x}",
-                            file_os_name, hash
-                        ).unwrap();
+                    } else{
+                        files_added += 1;
+                        if verbose >= 1 {
+                            writeln!(out_std,
+                                     "New file found:\n\tFile: {}\n\tHash: {:08x}",
+                                     file_os_name, hash
+                            ).unwrap();
+                        }
                     }
 
+                    read_bytes += read;
+                    files_processed += 1;
                     hashes.insert(file_os_name, hash);
                 } else if recursive && file.file_type().unwrap().is_dir() {
                     if !seen.contains(&file_name) {
@@ -243,12 +277,13 @@ fn hashes_from_dir<WS: Write, WE: Write>(buffer_size: usize, recursive: bool, ou
         }
     } else {
         //Write to file if output file specified
-        if verbose >= 1 {
-            let removed_iter = hashes_old.iter().filter(|x| !hashes.contains_key(x.0));
-            for (file, hash) in removed_iter {
+        let removed_iter = hashes_old.iter().filter(|x| !hashes.contains_key(x.0));
+        for (file, hash) in removed_iter {
+            files_removed += 1;
+            if verbose >= 1 {
                 writeln!(out_std,
-                    "Removed file found:\n\tFile: {}\n\tHash: {:08x}",
-                    file, hash
+                         "Removed file found:\n\tFile: {}\n\tHash: {:08x}",
+                         file, hash
                 ).unwrap();
             }
         }
@@ -271,6 +306,19 @@ fn hashes_from_dir<WS: Write, WE: Write>(buffer_size: usize, recursive: bool, ou
                 }
             };
         }
+    }
+    //Print statistics
+    if !quiet{
+        let elapsed = start_time.elapsed();
+        let size = Byte::from_bytes(read_bytes as u128);
+
+        println!("Statistics of the runtime:");
+        println!("\tElapsed time: {}:{}:{:.4}", elapsed.as_secs()/3600, elapsed.as_secs()/60, elapsed.as_secs_f32());
+        println!("\tFiles processed: {}", files_processed);
+        println!("\tBytes processed: {}", size.get_appropriate_unit(true));
+        println!("\tNumber of new files: {}", files_added);
+        println!("\tNumber of removed files: {}", files_removed);
+        println!("\tSkipped files due to permissions: {}", files_skipped);
     }
 }
 
@@ -337,7 +385,7 @@ mod tests {
 
         //TEST
         let hash = match crc32_hash(file_path.clone(), 32){
-            Ok(hash) => {hash}
+            Ok(hash) => {hash.0}
             Err(e) => {
                 assert!(false, "{}",e);
                 return;
@@ -419,7 +467,7 @@ mod tests {
         };
 
         //TEST
-        hashes_from_dir(32, false, "", &dir.path().as_os_str().to_string_lossy().into_owned(), 0, &mut out_std, &mut out_err);
+        hashes_from_dir(32, false, "", &dir.path().as_os_str().to_string_lossy().into_owned(), 0, true, &mut out_std, &mut out_err);
 
         let out_raw = String::from_utf8_lossy(&out_std).into_owned();
         let out_parsed =out_raw.split_terminator("\n");
@@ -542,7 +590,7 @@ mod tests {
             }
         };
         //TEST
-        hashes_from_dir(32, true, "", &dir.path().as_os_str().to_string_lossy().into_owned(), 0, &mut out_std, &mut out_err);
+        hashes_from_dir(32, true, "", &dir.path().as_os_str().to_string_lossy().into_owned(), 0,true, &mut out_std, &mut out_err);
 
         let out_raw = String::from_utf8_lossy(&out_std).into_owned();
 
@@ -636,7 +684,7 @@ mod tests {
         };
 
         //TEST
-        hashes_from_dir(32, false, dir.path().join("output").to_str().unwrap(), &dir.path().as_os_str().to_string_lossy().into_owned(), 0, &mut out_std, &mut out_err);
+        hashes_from_dir(32, false, dir.path().join("output").to_str().unwrap(), &dir.path().as_os_str().to_string_lossy().into_owned(), 0,true, &mut out_std, &mut out_err);
 
         let mut hashes = HashMap::new();
         match load_file(&mut hashes, dir.path().join("output").to_str().unwrap()){
@@ -758,7 +806,7 @@ mod tests {
             }
         };
         //TEST
-        hashes_from_dir(32, true, dir.path().join("output").to_str().unwrap(), &dir.path().as_os_str().to_string_lossy().into_owned(), 0, &mut out_std, &mut out_err);
+        hashes_from_dir(32, true, dir.path().join("output").to_str().unwrap(), &dir.path().as_os_str().to_string_lossy().into_owned(), 0,true, &mut out_std, &mut out_err);
 
         let mut hashes = HashMap::new();
         match load_file(&mut hashes, dir.path().join("output").to_str().unwrap()){
@@ -852,7 +900,7 @@ mod tests {
         };
 
         //Create output file
-        hashes_from_dir(32, false, dir.path().join("output").to_str().unwrap(), &dir.path().as_os_str().to_string_lossy().into_owned(), 0, &mut out_std, &mut out_err);
+        hashes_from_dir(32, false, dir.path().join("output").to_str().unwrap(), &dir.path().as_os_str().to_string_lossy().into_owned(), 0,true, &mut out_std, &mut out_err);
 
         //Modify file with crc32 hash 0x812651aa
         let mut f = match File::create(&file_path){
@@ -871,7 +919,7 @@ mod tests {
         };
 
         //TEST
-        hashes_from_dir(32, false, dir.path().join("output").to_str().unwrap(), &dir.path().as_os_str().to_string_lossy().into_owned(), 0, &mut out_std, &mut out_err);
+        hashes_from_dir(32, false, dir.path().join("output").to_str().unwrap(), &dir.path().as_os_str().to_string_lossy().into_owned(), 0,true, &mut out_std, &mut out_err);
 
 
         let mut hashes = HashMap::new();
@@ -997,7 +1045,7 @@ mod tests {
         };
 
         //Create output file
-        hashes_from_dir(32, true, dir.path().join("output").to_str().unwrap(), &dir.path().as_os_str().to_string_lossy().into_owned(), 0, &mut out_std, &mut out_err);
+        hashes_from_dir(32, true, dir.path().join("output").to_str().unwrap(), &dir.path().as_os_str().to_string_lossy().into_owned(), 0,true, &mut out_std, &mut out_err);
 
         //Modify file with crc32 hash 0x812651aa
         let mut f = match File::create(&file_path3){
@@ -1016,7 +1064,7 @@ mod tests {
         };
 
         //TEST
-        hashes_from_dir(32, true, dir.path().join("output").to_str().unwrap(), &dir.path().as_os_str().to_string_lossy().into_owned(), 0, &mut out_std, &mut out_err);
+        hashes_from_dir(32, true, dir.path().join("output").to_str().unwrap(), &dir.path().as_os_str().to_string_lossy().into_owned(), 0,true, &mut out_std, &mut out_err);
 
         let mut hashes = HashMap::new();
         match load_file(&mut hashes, dir.path().join("output").to_str().unwrap()){

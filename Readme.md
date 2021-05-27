@@ -11,6 +11,7 @@ USAGE:
 FLAGS:
     -h, --help         Prints help information
     -r, --recursive    Enable recursive search
+	-q, --quiet        Disable statistics at the end
     -V, --version      Prints version information
     -v                 Sets the level of verbosity: (repeat for increased verbosity)
                         Level 0: No verbose info

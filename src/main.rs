@@ -313,7 +313,7 @@ fn hashes_from_dir<WS: Write, WE: Write>(buffer_size: usize, recursive: bool, ou
         let size = Byte::from_bytes(read_bytes as u128);
 
         println!("Statistics of the runtime:");
-        println!("\tElapsed time: {}:{}:{:.4}", elapsed.as_secs()/3600, elapsed.as_secs()/60, elapsed.as_secs_f32());
+        println!("\tElapsed time: {}:{}:{:.4}", elapsed.as_secs()/3600, (elapsed.as_secs()/60)%60, (elapsed.as_secs_f32())%60.0);
         println!("\tFiles processed: {}", files_processed);
         println!("\tBytes processed: {}", size.get_appropriate_unit(true));
         println!("\tNumber of new files: {}", files_added);

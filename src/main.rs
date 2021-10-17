@@ -260,9 +260,20 @@ fn hashes_from_dir<WS: Write, WE: Write>(settings: &Setting, mut out_std: WS, mu
     loop {
         if directories.is_empty() {
             break;
-        } else {
-            let dir = directories.pop_front().unwrap();
-            for entry in match fs::read_dir(dir) {
+        }
+
+        let dir = directories.pop_front().unwrap();
+        for entry in match fs::read_dir(dir) {
+            Ok(entry) => entry,
+            Err(e) => {
+                if e.kind() != ErrorKind::PermissionDenied {
+                    writeln!(out_err, "Error when iterating file: {}", e).unwrap();
+                }
+                files_skipped += 1;
+                continue;
+            }
+        } {
+            let file = match entry {
                 Ok(entry) => entry,
                 Err(e) => {
                     if e.kind() != ErrorKind::PermissionDenied {
@@ -271,80 +282,69 @@ fn hashes_from_dir<WS: Write, WE: Write>(settings: &Setting, mut out_std: WS, mu
                     files_skipped += 1;
                     continue;
                 }
-            } {
-                let file = match entry {
-                    Ok(entry) => entry,
+            };
+            let file_name = file.path();
+            if file.file_type().unwrap().is_file() {
+                let file_os_name = file.path().as_os_str().to_string_lossy().into_owned();
+                if file_name.file_name().unwrap() == output_file_name
+                    && is_same_file(
+                        &file_name,
+                        settings.output.as_deref().unwrap_or_else(|| Path::new("")),
+                    )
+                    .unwrap_or(false)
+                {
+                    continue;
+                }
+                let (hash, read) = match crc32_hash(&file_name, settings.buffer_size) {
+                    Ok((hash, read)) => (hash, read),
                     Err(e) => {
                         if e.kind() != ErrorKind::PermissionDenied {
-                            writeln!(out_err, "Error when iterating file: {}", e).unwrap();
+                            writeln!(out_err, "Error when calculating hash: {}", e).unwrap();
                         }
                         files_skipped += 1;
                         continue;
                     }
                 };
-                let file_name = file.path();
-                if file.file_type().unwrap().is_file() {
-                    let file_os_name = file.path().as_os_str().to_string_lossy().into_owned();
-                    if file_name.file_name().unwrap() == output_file_name
-                        && is_same_file(
-                            &file_name,
-                            settings.output.as_deref().unwrap_or_else(|| Path::new("")),
+
+                if hashes_old.contains_key(&file_os_name) {
+                    let old_hash = hashes_old.get(&file_os_name).unwrap();
+                    if *old_hash != hash {
+                        writeln!(out_err, "File hash mismatch:\n\tFile: {}\n\tOld Hash: {:08x}\n\tNew Hash: {:08x}", file_os_name, old_hash, hash).unwrap();
+                    } else if settings.verbose >= Verbose::All {
+                        writeln!(
+                            out_std,
+                            "Known file found:\n\tFile: {}\n\tHash: {:08x}",
+                            file_os_name, hash
                         )
-                        .unwrap_or(false)
-                    {
-                        continue;
+                        .unwrap();
                     }
-                    let (hash, read) = match crc32_hash(&file_name, settings.buffer_size) {
-                        Ok((hash, read)) => (hash, read),
-                        Err(e) => {
-                            if e.kind() != ErrorKind::PermissionDenied {
-                                writeln!(out_err, "Error when calculating hash: {}", e).unwrap();
-                            }
-                            files_skipped += 1;
-                            continue;
-                        }
-                    };
-
-                    if hashes_old.contains_key(&file_os_name) {
-                        let old_hash = hashes_old.get(&file_os_name).unwrap();
-                        if *old_hash != hash {
-                            writeln!(out_err, "File hash mismatch:\n\tFile: {}\n\tOld Hash: {:08x}\n\tNew Hash: {:08x}", file_os_name, old_hash, hash).unwrap();
-                        } else if settings.verbose >= Verbose::All {
-                            writeln!(
-                                out_std,
-                                "Known file found:\n\tFile: {}\n\tHash: {:08x}",
-                                file_os_name, hash
-                            )
-                            .unwrap();
-                        }
-                    } else {
-                        files_added += 1;
-                        if settings.verbose >= Verbose::NewOldFiles {
-                            writeln!(
-                                out_std,
-                                "New file found:\n\tFile: {}\n\tHash: {:08x}",
-                                file_os_name, hash
-                            )
-                            .unwrap();
-                        }
+                } else {
+                    files_added += 1;
+                    if settings.verbose >= Verbose::NewOldFiles {
+                        writeln!(
+                            out_std,
+                            "New file found:\n\tFile: {}\n\tHash: {:08x}",
+                            file_os_name, hash
+                        )
+                        .unwrap();
                     }
-
-                    read_bytes += read;
-                    files_processed += 1;
-                    hashes.insert(file_os_name, hash);
-                } else if settings.recursive == Recursive::Yes
-                    && file.file_type().unwrap().is_dir()
-                    && !seen.contains(&file_name)
-                {
-                    seen.insert(file_name.clone());
-                    directories.push_back(file_name);
                 }
+
+                read_bytes += read;
+                files_processed += 1;
+                hashes.insert(file_os_name, hash);
+            } else if settings.recursive == Recursive::Yes
+                && file.file_type().unwrap().is_dir()
+                && !seen.contains(&file_name)
+            {
+                seen.insert(file_name.clone());
+                directories.push_back(file_name);
             }
         }
     }
     //Print to stdout if output file not specified
     if settings.output.is_none() {
-        for (file, hash) in hashes.iter() {
+        for (file, hash) in &hashes {
             writeln!(out_std, "{:08x}\t{}", hash, file).unwrap();
         }
     } else {
@@ -384,7 +384,7 @@ fn hashes_from_dir<WS: Write, WE: Write>(settings: &Setting, mut out_std: WS, mu
     //Print statistics
     if settings.quiet == Quiet::No {
         let elapsed = start_time.elapsed();
-        let size = Byte::from_bytes(read_bytes as u128);
+        let size = Byte::from_bytes(u128::from(read_bytes));
 
         println!("Statistics of the runtime:");
         println!(

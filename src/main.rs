@@ -432,12 +432,12 @@ fn load_file(hashes: &mut FxHashMap<String, u32>, file: &Path) -> Option<io::Err
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempdir::TempDir;
+    use tempfile::Builder;
 
     #[test]
     fn test_single_file() {
         //SETUP
-        let dir = match TempDir::new("unit_tests") {
+        let dir = match Builder::new().prefix("unit_tests").tempdir() {
             Ok(dir) => dir,
             Err(e) => {
                 panic!("Error when creating directory for unit test.\nError: {}", e);
@@ -507,7 +507,7 @@ mod tests {
         let mut out_err: Vec<u8> = Vec::new();
 
         //Create test dir
-        let dir = match TempDir::new("unit_tests") {
+        let dir = match Builder::new().prefix("unit_tests").tempdir() {
             Ok(dir) => dir,
             Err(e) => {
                 panic!("Error when creating directory for unit test.\nError: {}", e);
@@ -611,7 +611,7 @@ mod tests {
         let mut out_err: Vec<u8> = Vec::new();
 
         //Create test dir
-        let dir = match TempDir::new("unit_tests") {
+        let dir = match Builder::new().prefix("unit_tests").tempdir() {
             Ok(dir) => dir,
             Err(e) => {
                 panic!("Error when creating directory for unit test.\nError: {}", e);
@@ -757,7 +757,7 @@ mod tests {
         let mut out_err: Vec<u8> = Vec::new();
 
         //Create test dir
-        let dir = match TempDir::new("unit_tests") {
+        let dir = match Builder::new().prefix("unit_tests").tempdir() {
             Ok(dir) => dir,
             Err(e) => {
                 panic!("Error when creating directory for unit test.\nError: {}", e);
@@ -859,7 +859,7 @@ mod tests {
         let mut out_err: Vec<u8> = Vec::new();
 
         //Create test dir
-        let dir = match TempDir::new("unit_tests") {
+        let dir = match Builder::new().prefix("unit_tests").tempdir() {
             Ok(dir) => dir,
             Err(e) => {
                 panic!("Error when creating directory for unit test.\nError: {}", e);
@@ -1004,7 +1004,7 @@ mod tests {
         let mut out_err: Vec<u8> = Vec::new();
 
         //Create test dir
-        let dir = match TempDir::new("unit_tests") {
+        let dir = match Builder::new().prefix("unit_tests").tempdir() {
             Ok(dir) => dir,
             Err(e) => {
                 panic!("Error when creating directory for unit test.\nError: {}", e);
@@ -1139,7 +1139,7 @@ mod tests {
         let mut out_err: Vec<u8> = Vec::new();
 
         //Create test dir
-        let dir = match TempDir::new("unit_tests") {
+        let dir = match Builder::new().prefix("unit_tests").tempdir() {
             Ok(dir) => dir,
             Err(e) => {
                 panic!("Error when creating directory for unit test.\nError: {}", e);

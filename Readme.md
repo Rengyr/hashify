@@ -1,5 +1,5 @@
 Hashify\
-Dominik 'Rengyr' Kosík <of@rengyr.eu>\
+Dominik 'Rengyr' Kosík, <mail@rengyr.eu>\
 CRC32 hash.\
 \
 [![Project status](https://github.com/Rengyr/hashify/actions/workflows/rust.yml/badge.svg)](https://github.com/Rengyr/hashify/actions/workflows/rust.yml)

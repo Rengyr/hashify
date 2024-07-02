@@ -44,7 +44,7 @@ struct Setting {
 
 fn main() {
     let matches = App::new("Hashify")
-        .version("1.3.3")
+        .version("1.3.4")
         .author("Dominik 'Rengyr' Kosík <of@rengyr.eu>")
         .about("CRC32 hash.")
         .arg(
@@ -203,7 +203,7 @@ fn hash_from_input<R: Read>(mut input: R, settings: &Setting) -> Result<u32, Err
     let mut length = 1;
 
     while length > 0 {
-        length = match input.read(&mut *buffer) {
+        length = match input.read(&mut buffer) {
             Ok(len) => len,
             Err(e) => {
                 return Err(Error::new(
@@ -451,7 +451,7 @@ mod tests {
                 panic!("Error when creating file for test.\nError: {}", e);
             }
         };
-        match f.write("Test string\nIn test file".as_bytes()) {
+        match f.write_all("Test string\nIn test file".as_bytes()) {
             Ok(_) => {}
             Err(e) => {
                 panic!("Error when writing to the test file.\nError: {}", e);
@@ -522,7 +522,7 @@ mod tests {
                 panic!("Error when creating file for test.\nError: {}", e);
             }
         };
-        match f.write("Test string\nIn test file".as_bytes()) {
+        match f.write_all("Test string\nIn test file".as_bytes()) {
             Ok(_) => {}
             Err(e) => {
                 panic!("Error when writing to the test file.\nError: {}", e);
@@ -537,7 +537,7 @@ mod tests {
                 panic!("Error when creating file for test.\nError: {}", e);
             }
         };
-        match f.write("Second file :3".as_bytes()) {
+        match f.write_all("Second file :3".as_bytes()) {
             Ok(_) => {}
             Err(e) => {
                 panic!("Error when writing to the test file.\nError: {}", e);
@@ -626,7 +626,7 @@ mod tests {
                 panic!("Error when creating file for test.\nError: {}", e);
             }
         };
-        match f.write("Test string\nIn test file".as_bytes()) {
+        match f.write_all("Test string\nIn test file".as_bytes()) {
             Ok(_) => {}
             Err(e) => {
                 panic!("Error when writing to the test file.\nError: {}", e);
@@ -649,7 +649,7 @@ mod tests {
                 panic!("Error when creating file for test.\nError: {}", e);
             }
         };
-        match f.write("Second file :3".as_bytes()) {
+        match f.write_all("Second file :3".as_bytes()) {
             Ok(_) => {}
             Err(e) => {
                 panic!("Error when writing to the test file.\nError: {}", e);
@@ -672,7 +672,7 @@ mod tests {
                 panic!("Error when creating file for test.\nError: {}", e);
             }
         };
-        match f.write("Another file \\o/".as_bytes()) {
+        match f.write_all("Another file \\o/".as_bytes()) {
             Ok(_) => {}
             Err(e) => {
                 panic!("Error when writing to the test file.\nError: {}", e);
@@ -772,7 +772,7 @@ mod tests {
                 panic!("Error when creating file for test.\nError: {}", e);
             }
         };
-        match f.write("Test string\nIn test file".as_bytes()) {
+        match f.write_all("Test string\nIn test file".as_bytes()) {
             Ok(_) => {}
             Err(e) => {
                 panic!("Error when writing to the test file.\nError: {}", e);
@@ -787,7 +787,7 @@ mod tests {
                 panic!("Error when creating file for test.\nError: {}", e);
             }
         };
-        match f.write("Second file :3".as_bytes()) {
+        match f.write_all("Second file :3".as_bytes()) {
             Ok(_) => {}
             Err(e) => {
                 panic!("Error when writing to the test file.\nError: {}", e);
@@ -874,7 +874,7 @@ mod tests {
                 panic!("Error when creating file for test.\nError: {}", e);
             }
         };
-        match f.write("Test string\nIn test file".as_bytes()) {
+        match f.write_all("Test string\nIn test file".as_bytes()) {
             Ok(_) => {}
             Err(e) => {
                 panic!("Error when writing to the test file.\nError: {}", e);
@@ -897,7 +897,7 @@ mod tests {
                 panic!("Error when creating file for test.\nError: {}", e);
             }
         };
-        match f.write("Second file :3".as_bytes()) {
+        match f.write_all("Second file :3".as_bytes()) {
             Ok(_) => {}
             Err(e) => {
                 panic!("Error when writing to the test file.\nError: {}", e);
@@ -920,7 +920,7 @@ mod tests {
                 panic!("Error when creating file for test.\nError: {}", e);
             }
         };
-        match f.write("Another file \\o/".as_bytes()) {
+        match f.write_all("Another file \\o/".as_bytes()) {
             Ok(_) => {}
             Err(e) => {
                 panic!("Error when writing to the test file.\nError: {}", e);
@@ -1019,7 +1019,7 @@ mod tests {
                 panic!("Error when creating file for test.\nError: {}", e);
             }
         };
-        match f.write("Test string\nIn test file".as_bytes()) {
+        match f.write_all("Test string\nIn test file".as_bytes()) {
             Ok(_) => {}
             Err(e) => {
                 panic!("Error when writing to the test file.\nError: {}", e);
@@ -1034,7 +1034,7 @@ mod tests {
                 panic!("Error when creating file for test.\nError: {}", e);
             }
         };
-        match f.write("Second file :3".as_bytes()) {
+        match f.write_all("Second file :3".as_bytes()) {
             Ok(_) => {}
             Err(e) => {
                 panic!("Error when writing to the test file.\nError: {}", e);
@@ -1060,7 +1060,7 @@ mod tests {
                 panic!("Error when rewriting file for test.\nError: {}", e);
             }
         };
-        match f.write("Modified file <3".as_bytes()) {
+        match f.write_all("Modified file <3".as_bytes()) {
             Ok(_) => {}
             Err(e) => {
                 panic!("Error when writing to the test file.\nError: {}", e);
@@ -1154,7 +1154,7 @@ mod tests {
                 panic!("Error when creating file for test.\nError: {}", e);
             }
         };
-        match f.write("Test string\nIn test file".as_bytes()) {
+        match f.write_all("Test string\nIn test file".as_bytes()) {
             Ok(_) => {}
             Err(e) => {
                 panic!("Error when writing to the test file.\nError: {}", e);
@@ -1177,7 +1177,7 @@ mod tests {
                 panic!("Error when creating file for test.\nError: {}", e);
             }
         };
-        match f.write("Second file :3".as_bytes()) {
+        match f.write_all("Second file :3".as_bytes()) {
             Ok(_) => {}
             Err(e) => {
                 panic!("Error when writing to the test file.\nError: {}", e);
@@ -1200,7 +1200,7 @@ mod tests {
                 panic!("Error when creating file for test.\nError: {}", e);
             }
         };
-        match f.write("Another file \\o/".as_bytes()) {
+        match f.write_all("Another file \\o/".as_bytes()) {
             Ok(_) => {}
             Err(e) => {
                 panic!("Error when writing to the test file.\nError: {}", e);
@@ -1226,7 +1226,7 @@ mod tests {
                 panic!("Error when rewriting file for test.\nError: {}", e);
             }
         };
-        match f.write("Modified file <3".as_bytes()) {
+        match f.write_all("Modified file <3".as_bytes()) {
             Ok(_) => {}
             Err(e) => {
                 panic!("Error when writing to the test file.\nError: {}", e);
